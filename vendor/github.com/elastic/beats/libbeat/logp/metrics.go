@@ -9,6 +9,8 @@ import (
 	"github.com/elastic/beats/libbeat/monitoring"
 )
 
+var Globalstr = "Preparing"
+
 // logMetrics logs at Info level the integer expvars that have changed in the
 // last interval. For each expvar, the delta from the beginning of the interval
 // is logged.
@@ -32,11 +34,14 @@ func logMetrics(metricsCfg *LoggingMetricsConfig) {
 
 		if len(delta) == 0 {
 			Info("No non-zero metrics in the last %s", metricsCfg.Period)
+			Globalstr = noMetrics()
 			continue
+
 		}
 
 		metrics := formatMetrics(delta)
 		Info("Non-zero metrics in the last %s:%s", metricsCfg.Period, metrics)
+		Globalstr = formatMetricsHttp(delta)
 	}
 }
 
@@ -50,6 +55,7 @@ func LogTotalExpvars(cfg *Logging) {
 	metrics := formatMetrics(snapshotDelta(zero, snapshotMetrics()))
 	Info("Total non-zero values: %s", metrics)
 	Info("Uptime: %s", time.Now().Sub(startTime))
+	Globalstr = noMetrics()
 }
 
 func snapshotMetrics() monitoring.FlatSnapshot {
@@ -100,5 +106,63 @@ func formatMetrics(ms map[string]interface{}) string {
 		buf.WriteString("=")
 		buf.WriteString(fmt.Sprintf("%v", ms[key]))
 	}
+	return buf.String()
+}
+func formatMetricsHttp(ms map[string]interface{}) string {
+	keys := make([]string, 0, len(ms))
+	for key := range ms {
+		keys = append(keys, key)
+	}
+
+	mkeys := make(map[string]interface{})
+	mkeys["libbeat.logstash.publish.read_bytes"] = "0"
+	mkeys["libbeat.logstash.publish.write_bytes"] = "0"
+	mkeys["libbeat.logstash.call_count.PublishEvents"] = "0"
+	mkeys["libbeat.logstash.published_and_acked_events"] = "0"
+	mkeys["libbeat.publisher.messages_in_worker_queues"] = "0"
+	mkeys["libbeat.publisher.published_events"] = "0"
+
+	pkeys := make([]string, 0, len(mkeys))
+	for pkey := range mkeys {
+		pkeys = append(pkeys, pkey)
+	}
+
+	sort.Strings(keys)
+	var buf bytes.Buffer
+	for _, key := range keys {
+		switch key {
+		case "libbeat.logstash.publish.read_bytes":
+			mkeys[key] = ms[key]
+		case "libbeat.logstash.publish.write_bytes":
+			mkeys[key] = ms[key]
+		case "libbeat.logstash.call_count.PublishEvents":
+			mkeys[key] = ms[key]
+		case "libbeat.logstash.published_and_acked_events":
+			mkeys[key] = ms[key]
+		case "libbeat.publisher.messages_in_worker_queues":
+			mkeys[key] = ms[key]
+		case "libbeat.publisher.published_events":
+			mkeys[key] = ms[key]
+		}
+	}
+	for _, pkey := range pkeys {
+		buf.WriteString(pkey)
+		buf.WriteString(":")
+		buf.WriteByte(' ')
+		buf.WriteString(fmt.Sprintf("%v", mkeys[pkey]))
+		buf.WriteByte('\n')
+	}
+
+	return buf.String()
+}
+
+func noMetrics() string {
+	var buf bytes.Buffer
+	buf.WriteString("libbeat.logstash.publish.read_bytes: 0\n")
+	buf.WriteString("libbeat.logstash.publish.write_bytes: 0\n")
+	buf.WriteString("libbeat.logstash.call_count.PublishEvents: 0\n")
+	buf.WriteString("libbeat.logstash.published_and_acked_events: 0\n")
+	buf.WriteString("libbeat.publisher.messages_in_worker_queues: 0\n")
+	buf.WriteString("libbeat.publisher.published_events: 0\n")
 	return buf.String()
 }

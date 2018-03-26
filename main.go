@@ -16,12 +16,18 @@ package main
 
 import (
 	"log"
+	"net/http"
 
 	"github.com/elastic/beats/libbeat/beat"
+	"github.com/elastic/beats/libbeat/logp"
 	"github.com/mheese/journalbeat/beater"
 )
 
 func main() {
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(logp.Globalstr))
+	})
+	go http.ListenAndServe(":9090", nil)
 	err := beat.Run("journalbeat", "", beater.New)
 	if err != nil {
 		log.Fatal(err)
