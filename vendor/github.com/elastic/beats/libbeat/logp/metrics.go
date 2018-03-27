@@ -55,7 +55,7 @@ func LogTotalExpvars(cfg *Logging) {
 	metrics := formatMetrics(snapshotDelta(zero, snapshotMetrics()))
 	Info("Total non-zero values: %s", metrics)
 	Info("Uptime: %s", time.Now().Sub(startTime))
-	Globalstr = noMetrics()
+	Globalstr = formatMetricsHttp(snapshotDelta(zero, snapshotMetrics()))
 }
 
 func snapshotMetrics() monitoring.FlatSnapshot {
@@ -127,7 +127,7 @@ func formatMetricsHttp(ms map[string]interface{}) string {
 		pkeys = append(pkeys, pkey)
 	}
 
-	sort.Strings(keys)
+	//sort.Strings(keys)
 	var buf bytes.Buffer
 	for _, key := range keys {
 		switch key {
@@ -145,6 +145,7 @@ func formatMetricsHttp(ms map[string]interface{}) string {
 			mkeys[key] = ms[key]
 		}
 	}
+	sort.Strings(pkeys)
 	for _, pkey := range pkeys {
 		buf.WriteString(pkey)
 		buf.WriteString(":")
@@ -158,9 +159,9 @@ func formatMetricsHttp(ms map[string]interface{}) string {
 
 func noMetrics() string {
 	var buf bytes.Buffer
+	buf.WriteString("libbeat.logstash.call_count.PublishEvents: 0\n")
 	buf.WriteString("libbeat.logstash.publish.read_bytes: 0\n")
 	buf.WriteString("libbeat.logstash.publish.write_bytes: 0\n")
-	buf.WriteString("libbeat.logstash.call_count.PublishEvents: 0\n")
 	buf.WriteString("libbeat.logstash.published_and_acked_events: 0\n")
 	buf.WriteString("libbeat.publisher.messages_in_worker_queues: 0\n")
 	buf.WriteString("libbeat.publisher.published_events: 0\n")

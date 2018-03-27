@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"sync"
 	"time"
@@ -42,6 +43,7 @@ type Journalbeat struct {
 	cursorChan         chan string
 	pending, completed chan *eventReference
 	wg                 sync.WaitGroup
+	srv                *http.Server
 }
 
 func (jb *Journalbeat) initJournal() error {
@@ -210,6 +212,7 @@ func New(b *beat.Beat, cfg *common.Config) (beat.Beater, error) {
 		cursorChan: make(chan string),
 		pending:    make(chan *eventReference),
 		completed:  make(chan *eventReference, config.PendingQueue.CompletedQueueSize),
+		srv:        startHttpServer(),
 	}
 
 	if err = jb.initJournal(); err != nil {
@@ -228,18 +231,18 @@ func (jb *Journalbeat) Run(b *beat.Beat) error {
 	defer func() {
 		_ = jb.client.Close()
 		_ = jb.journal.Close()
+		jb.srv.Close()
+		time.Sleep(1 * time.Second)
 		close(jb.cursorChan)
 		close(jb.completed)
 		close(jb.pending)
 		jb.wg.Wait()
 	}()
-
 	go jb.managePendingQueueLoop()
-
 	if jb.config.WriteCursorState {
 		go jb.writeCursorLoop()
 	}
-
+	jb.srv.ListenAndServe()
 	// load the previously saved queue of unsent events and try to publish them if any
 	if err := jb.publishPending(); err != nil {
 		logp.Warn("could not read the pending queue: %s", err)
@@ -277,9 +280,26 @@ func (jb *Journalbeat) Run(b *beat.Beat) error {
 	}
 	return nil
 }
+func startHttpServer() *http.Server {
+	srv := &http.Server{Addr: ":18080"}
+
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(logp.Globalstr))
+	})
+
+	go func() {
+		if err := srv.ListenAndServe(); err != nil {
+			logp.Info("Httpserver: ListenAndServe() error: %s", err)
+		}
+	}()
+
+	// returning reference so caller can call Shutdown()
+	return srv
+}
 
 // Stop stops Journalbeat execution
 func (jb *Journalbeat) Stop() {
 	logp.Info("Stopping Journalbeat")
+	time.Sleep(1 * time.Second)
 	close(jb.done)
 }
