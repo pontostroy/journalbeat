@@ -281,7 +281,7 @@ func (jb *Journalbeat) Run(b *beat.Beat) error {
 	return nil
 }
 func startHttpServer() *http.Server {
-	srv := &http.Server{Addr: ":18080"}
+	srv := &http.Server{Addr: "localhost:18080"}
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(logp.Globalstr))
